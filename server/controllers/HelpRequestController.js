@@ -1,5 +1,6 @@
 // server/controllers/HelpRequestController.js
 const HelpRequestModel = require("../models/HelpRequestModel");
+const { buildDemoResponder } = require("../fixtures/demoFixtures");
 
 async function createHelpRequest(req, res) {
   try {
@@ -162,8 +163,53 @@ async function updateRequestStatus(req, res) {
   }
 }
 
+// POST /api/help-requests/:id/accept
+//
+// Claims a request for a responder. Returns 409 when someone already has it,
+// so two responder tabs racing for the same emergency cannot both win: the
+// check lives in the model, not in a disabled button.
+async function acceptHelpRequest(req, res) {
+  try {
+    const { id } = req.params;
+    const existing = await HelpRequestModel.getById(id);
+
+    if (!existing) {
+      return res.status(404).json({
+        error: "Help request not found",
+        message: `No help request found with id: ${id}`,
+      });
+    }
+
+    // The demo responder is seeded; a real deployment would take identity
+    // from the authenticated session instead.
+    const responder = req.body && req.body.responder
+      ? req.body.responder
+      : buildDemoResponder(existing);
+
+    const result = await HelpRequestModel.accept(id, responder);
+
+    if (!result.ok) {
+      return res.status(409).json({
+        error: "Already accepted",
+        message: "Another responder has already accepted this request",
+        request: result.request,
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Help request accepted",
+      request: result.request,
+    });
+  } catch (err) {
+    console.error("[Neo][HelpRequestController] \u274c Accept error:", err);
+    res.status(500).json({ error: "Failed to accept help request", message: err.message });
+  }
+}
+
 module.exports = {
   createHelpRequest,
+  acceptHelpRequest,
   getAllHelpRequests,
   getPendingRequests,
   getActiveRequests,

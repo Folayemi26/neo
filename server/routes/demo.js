@@ -12,6 +12,9 @@ router.get("/emergencies", DemoController.listEmergencies);
 // GET /api/demo/emergencies/:id - Follow one emergency's relay progress
 router.get("/emergencies/:id", DemoController.getEmergency);
 
+// GET /api/demo/responder/queue - Active requests with distance and ETA
+router.get("/responder/queue", DemoController.getResponderQueue);
+
 // GET /api/demo/network - Topology and event log for the network view
 router.get("/network", DemoController.getNetwork);
 

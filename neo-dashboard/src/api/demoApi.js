@@ -39,6 +39,27 @@ export async function resetDemo() {
   return res.data;
 }
 
+// The responder view's queue: the seeded responder plus active requests,
+// each annotated with the distance and ETA server-side.
+export async function fetchResponderQueue() {
+  const res = await axios.get(`${API_BASE_WITH_PATH}/demo/responder/queue`);
+  return { responder: res.data.responder, requests: res.data.requests || [] };
+}
+
+// Claims a request. A 409 is an expected outcome, not an error: it means
+// another responder got there first, so it is reported rather than thrown.
+export async function acceptRequest(id, responder) {
+  try {
+    const res = await axios.post(`${API_BASE_WITH_PATH}/help-requests/${id}/accept`, { responder });
+    return { ok: true, request: res.data.request };
+  } catch (err) {
+    if (err.response && err.response.status === 409) {
+      return { ok: false, conflict: true, request: err.response.data.request };
+    }
+    throw err;
+  }
+}
+
 // Structured emergency analysis (Gemini, with keyword fallback).
 export async function analyzeEmergency(message) {
   const res = await axios.post(`${API_BASE_WITH_PATH}/medai/analyze`, { message });

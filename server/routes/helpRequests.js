@@ -22,5 +22,8 @@ router.get("/:id", HelpRequestController.getHelpRequestById);
 // PATCH /api/help-requests/:id/status - Update help request status
 router.patch("/:id/status", HelpRequestController.updateRequestStatus);
 
+// POST /api/help-requests/:id/accept - Claim a request as a responder
+router.post("/:id/accept", HelpRequestController.acceptHelpRequest);
+
 module.exports = router;
 

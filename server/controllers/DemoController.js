@@ -5,6 +5,7 @@
 const DemoTransport = require("../services/DemoTransport");
 const HelpRequestModel = require("../models/HelpRequestModel");
 const EmergencyAnalyzer = require("../services/EmergencyAnalyzer");
+const { DEMO_LOCATION, DEMO_RESPONDER, buildDemoResponder } = require("../fixtures/demoFixtures");
 
 // POST /api/demo/emergencies
 // Body: { message, analysis?, latitude?, longitude?, address? }
@@ -34,11 +35,15 @@ async function sendEmergency(req, res) {
     }
 
     // Location is optional on purpose: a denied geolocation prompt must not
-    // block an emergency.
-    const location =
-      latitude !== undefined && longitude !== undefined && latitude !== null && longitude !== null
-        ? { latitude: Number(latitude), longitude: Number(longitude), address: address || null }
-        : null;
+    // block an emergency. When the browser gives us nothing we fall back to
+    // the demo fixture, which is tagged with source: "demo-fixture" so it is
+    // never mistaken for a real position.
+    const hasCoords =
+      latitude !== undefined && longitude !== undefined && latitude !== null && longitude !== null;
+
+    const location = hasCoords
+      ? { latitude: Number(latitude), longitude: Number(longitude), address: address || null }
+      : { ...DEMO_LOCATION };
 
     const transport = DemoTransport.send({ originalText: message, ai, location });
 
@@ -90,6 +95,40 @@ async function getNetwork(req, res) {
   });
 }
 
+// GET /api/demo/responder/queue
+//
+// The responder view's single source: who the seeded responder is, plus the
+// active requests annotated with the distance and ETA they would have if this
+// responder took them. Computed here so the distance formula lives in one
+// place rather than being duplicated in the browser.
+async function getResponderQueue(req, res) {
+  try {
+    const requests = await HelpRequestModel.getActive();
+
+    const annotated = requests.map((request) => {
+      const preview = buildDemoResponder(request);
+      return {
+        ...request,
+        distanceMiles: preview.distanceMiles,
+        etaMinutes: preview.etaMinutes,
+      };
+    });
+
+    res.json({
+      success: true,
+      responder: {
+        id: DEMO_RESPONDER.id,
+        name: DEMO_RESPONDER.name,
+        verified: DEMO_RESPONDER.verified,
+      },
+      requests: annotated,
+    });
+  } catch (error) {
+    console.error("[Neo][DemoController] \u274c Queue error:", error);
+    res.status(500).json({ error: "Failed to load responder queue", message: error.message });
+  }
+}
+
 // POST /api/demo/reset
 async function resetDemo(req, res) {
   try {
@@ -103,6 +142,7 @@ async function resetDemo(req, res) {
 
 module.exports = {
   sendEmergency,
+  getResponderQueue,
   getEmergency,
   listEmergencies,
   getNetwork,

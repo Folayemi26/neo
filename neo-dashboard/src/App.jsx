@@ -15,6 +15,7 @@ import Settings from "./pages/Settings";
 import DisasterManagement from "./pages/DisasterManagement";
 import DemoNetwork from "./pages/DemoNetwork";
 import DemoVictim from "./pages/DemoVictim";
+import DemoResponder from "./pages/DemoResponder";
 import LocationUpdates from "./pages/LocationUpdates";
 import RequestHelpModal from "./components/dashboard/RequestHelpModal";
 import StatusUpdateModal from "./components/dashboard/StatusUpdateModal";
@@ -101,6 +102,7 @@ export default function App() {
           one can be opened in its own tab for the one-laptop demo. Every
           existing dashboard route is unchanged, under AppContent below. */}
       <Route path="/demo/victim" element={<DemoVictim />} />
+      <Route path="/demo/responder" element={<DemoResponder />} />
       <Route path="/demo/network" element={<DemoNetwork />} />
       <Route path="/*" element={<AppContent />} />
     </Routes>

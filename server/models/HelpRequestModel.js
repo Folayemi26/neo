@@ -107,6 +107,38 @@ module.exports = {
     return null;
   },
 
+  /**
+   * Claims a request for a responder. Succeeds only from "pending", so a
+   * second responder cannot take an emergency someone is already handling.
+   *
+   * load() and save() are synchronous and nothing is awaited between them, so
+   * the read-check-write runs to completion within one turn of the event loop
+   * and two concurrent calls cannot interleave.
+   *
+   * @returns {{ok: boolean, reason: string|null, request: object|null}}
+   */
+  async accept(id, responder) {
+    const data = load();
+    const request = data.requests.find((r) => r.id === id);
+
+    if (!request) {
+      return { ok: false, reason: "not_found", request: null };
+    }
+    if (request.status !== "pending") {
+      // Already accepted, fulfilled or cancelled. Report who holds it.
+      return { ok: false, reason: "already_taken", request };
+    }
+
+    request.status = "accepted";
+    request.responder = responder;
+    request.acceptedAt = new Date().toISOString();
+    request.updatedAt = request.acceptedAt;
+    save(data);
+
+    console.log(`[Neo][HelpRequestModel] 🤝 ${id} accepted by ${responder && responder.name}`);
+    return { ok: true, reason: null, request };
+  },
+
   async getRecent(limit = 50) {
     const data = load();
     return data.requests
