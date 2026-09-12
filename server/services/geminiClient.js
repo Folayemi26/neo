@@ -19,12 +19,19 @@
 
 const { GoogleGenerativeAI, SchemaType } = require("@google/generative-ai");
 
-// Ordered newest-first. The ladder matters: a given API key may not have
-// access to every model, so we walk down until one answers.
+// The floating "-latest" alias goes first on purpose: Google retires model
+// names on its own schedule, and a pinned name silently rotting is exactly how
+// this integration broke before. The two concrete names behind it are verified
+// fallbacks in case the alias itself ever stops resolving.
+//
+// Verified against the live API on 2026-09-12. Note that ListModels advertises
+// models a given key cannot actually call (gemini-2.5-flash lists but returns
+// "no longer available to new users"), so this list reflects what answered a
+// real generateContent call, not what ListModels reported.
 const DEFAULT_MODEL_CANDIDATES = [
-  "gemini-2.0-flash",
-  "gemini-2.5-flash",
-  "gemini-1.5-flash",
+  "gemini-flash-latest",
+  "gemini-3.8-flash",
+  "gemini-3.5-flash",
 ];
 
 const DEFAULT_TIMEOUT_MS = 12000;

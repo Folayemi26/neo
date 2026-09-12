@@ -10,6 +10,8 @@ const assert = require("node:assert");
 const SDK_PATH = require.resolve("@google/generative-ai");
 const CLIENT_PATH = require.resolve("../services/geminiClient");
 const { SchemaType } = require("@google/generative-ai");
+const { DEFAULT_MODEL_CANDIDATES } = require("../services/geminiClient");
+const [FIRST_MODEL, SECOND_MODEL] = DEFAULT_MODEL_CANDIDATES;
 
 process.env.GEMINI_API_KEY = "test-key-not-a-real-secret";
 
@@ -49,16 +51,16 @@ function reply(text) {
 
 test("walks down the model ladder until one answers", async () => {
   const { client, attempted } = loadClientWith((model) => {
-    if (model === "gemini-2.0-flash") throw new Error("404 model not found");
+    if (model === FIRST_MODEL) throw new Error("404 model not found");
     return reply('{"ok":true}');
   });
 
   const { data, model } = await client.generateJSON("prompt");
 
   assert.deepStrictEqual(data, { ok: true });
-  assert.strictEqual(model, "gemini-2.5-flash");
-  assert.strictEqual(attempted[0], "gemini-2.0-flash", "the retired model is tried first");
-  assert.strictEqual(attempted[1], "gemini-2.5-flash", "then it falls through");
+  assert.strictEqual(model, SECOND_MODEL);
+  assert.strictEqual(attempted[0], FIRST_MODEL, "the first candidate is tried first");
+  assert.strictEqual(attempted[1], SECOND_MODEL, "then it falls through");
 });
 
 test("throws with every attempt listed when no model answers", async () => {
@@ -70,7 +72,7 @@ test("throws with every attempt listed when no model answers", async () => {
     () => client.generateJSON("prompt"),
     (err) => {
       assert.match(err.message, /All Gemini models failed/);
-      assert.match(err.message, /gemini-2\.0-flash/);
+      assert.ok(err.message.includes(FIRST_MODEL));
       return true;
     }
   );
@@ -78,7 +80,7 @@ test("throws with every attempt listed when no model answers", async () => {
 
 test("reuses a model that already answered instead of retrying failures", async () => {
   const { client, attempted } = loadClientWith((model) => {
-    if (model === "gemini-2.0-flash") throw new Error("404");
+    if (model === FIRST_MODEL) throw new Error("404");
     return reply('{"n":1}');
   });
 
@@ -86,7 +88,7 @@ test("reuses a model that already answered instead of retrying failures", async 
   const callsAfterFirst = attempted.length;
   await client.generateJSON("second");
 
-  assert.strictEqual(attempted[callsAfterFirst], "gemini-2.5-flash",
+  assert.strictEqual(attempted[callsAfterFirst], SECOND_MODEL,
     "the known-good model is tried first on the next call");
   assert.strictEqual(attempted.length, callsAfterFirst + 1,
     "the failing model is not retried");
