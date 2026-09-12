@@ -20,9 +20,12 @@ export async function sendEmergency({ message, analysis, latitude, longitude, ad
   return res.data;
 }
 
+// Returns { transport, helpRequest }. The victim view needs both: the
+// transport for relay progress, and the help request for the responder's
+// acceptance once it has been delivered.
 export async function fetchEmergency(id) {
   const res = await axios.get(`${API_BASE_WITH_PATH}/demo/emergencies/${id}`);
-  return res.data.transport;
+  return { transport: res.data.transport, helpRequest: res.data.helpRequest || null };
 }
 
 // Topology plus the recorded event log of the most recent emergency.

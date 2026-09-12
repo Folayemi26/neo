@@ -3,6 +3,7 @@
 // simulated relay, follow its progress, and reset between runs.
 
 const DemoTransport = require("../services/DemoTransport");
+const HelpRequestModel = require("../models/HelpRequestModel");
 const EmergencyAnalyzer = require("../services/EmergencyAnalyzer");
 
 // POST /api/demo/emergencies
@@ -49,6 +50,10 @@ async function sendEmergency(req, res) {
 }
 
 // GET /api/demo/emergencies/:id
+//
+// Returns the relay progress and, once delivered, the stored help request
+// alongside it. The victim view polls this one endpoint for the whole
+// journey: relaying, delivered, then accepted by a responder.
 async function getEmergency(req, res) {
   const transport = DemoTransport.get(req.params.id);
   if (!transport) {
@@ -57,7 +62,12 @@ async function getEmergency(req, res) {
       message: `No demo emergency with id: ${req.params.id}`,
     });
   }
-  res.json({ success: true, transport });
+
+  const helpRequest = transport.helpRequestId
+    ? await HelpRequestModel.getById(transport.helpRequestId)
+    : null;
+
+  res.json({ success: true, transport, helpRequest });
 }
 
 // GET /api/demo/emergencies
