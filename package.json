@@ -13,6 +13,7 @@
     "start": "cd server && npm start",
     "start:server": "cd server && npm start",
     "start:dashboard": "cd neo-dashboard && npm run dev",
+    "test": "cd server && npm test",
     "stop": "scripts\\stop.bat",
     "start:app": "scripts\\start-app.bat"
   },

@@ -18,5 +18,8 @@ router.post("/process_text", MedAIController.processText);
 // POST /api/medai/process_audio - Process audio input
 router.post("/process_audio", upload.single("file"), MedAIController.processAudio);
 
+// POST /api/medai/analyze - Structured emergency extraction for responders
+router.post("/analyze", MedAIController.analyzeEmergency);
+
 module.exports = router;
 
