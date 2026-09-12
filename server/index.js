@@ -32,6 +32,7 @@ const routesRouter = require("./routes/routes");
 const locationUpdatesRouter = require("./routes/locationUpdates");
 const weatherRouter = require("./routes/weather");
 const configRouter = require("./routes/config");
+const demoRouter = require("./routes/demo");
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -72,6 +73,7 @@ app.use("/api/routes", routesRouter);
 app.use("/api/location-updates", locationUpdatesRouter);
 app.use("/api/weather", weatherRouter);
 app.use("/api/config", configRouter);
+app.use("/api/demo", demoRouter);
 
 app.listen(PORT, () => {
   console.log(`[Neo][Server] 🌐 Listening on port ${PORT}`);

@@ -6,7 +6,11 @@ const path = require("path");
 // model share one implementation rather than keeping divergent copies.
 const { summarizeHelpRequest, analyzePriority } = require("../utils/keywordTriage");
 
-const DB_PATH = path.join(__dirname, "../../data/helpRequests.json");
+// Overridable so tests can point at a temporary file instead of the real
+// store. Resolved once at load, so set it before requiring this module.
+const DB_PATH = process.env.HELP_REQUESTS_DB
+  ? path.resolve(process.env.HELP_REQUESTS_DB)
+  : path.join(__dirname, "../../data/helpRequests.json");
 const DATA_DIR = path.dirname(DB_PATH);
 
 // Ensure data directory exists
@@ -114,6 +118,21 @@ module.exports = {
     save({ requests: [] });
     console.log("[Neo][HelpRequestModel] 🧹 Cleared all help requests");
     return { success: true };
+  },
+
+  // Removes only requests whose id carries the given prefix. Demo data is
+  // namespaced so a demo reset can never delete a real help request.
+  async removeByIdPrefix(prefix) {
+    if (!prefix) throw new Error("removeByIdPrefix requires a prefix");
+    const data = load();
+    const before = data.requests.length;
+    data.requests = data.requests.filter((r) => !String(r.id || "").startsWith(prefix));
+    const removed = before - data.requests.length;
+    if (removed > 0) {
+      save(data);
+      console.log(`[Neo][HelpRequestModel] 🧹 Removed ${removed} request(s) with prefix ${prefix}`);
+    }
+    return removed;
   },
 };
 
