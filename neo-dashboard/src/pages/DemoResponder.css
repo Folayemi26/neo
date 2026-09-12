@@ -199,3 +199,36 @@
   .demoResponder { padding: 20px 16px; }
   .rRespond { width: 100%; }
 }
+
+/* Spoken alert */
+
+.rAudio {
+  background: transparent;
+  color: #93c5fd;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 13px 22px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.rAudio:hover:not(:disabled) { background: #0f172a; color: #bfdbfe; }
+.rAudio:disabled { opacity: 0.6; cursor: progress; }
+
+.rCard__audioScript {
+  display: block;
+  margin-top: 12px;
+  color: #64748b;
+  font-size: 13px;
+  font-style: italic;
+  line-height: 1.55;
+}
+
+.rCard__audioError {
+  margin-top: 14px;
+  color: #fcd34d;
+  font-size: 14px;
+  line-height: 1.55;
+}

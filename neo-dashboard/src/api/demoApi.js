@@ -60,6 +60,34 @@ export async function acceptRequest(id, responder) {
   }
 }
 
+// Fetches the spoken alert for an emergency.
+//
+// Uses fetch rather than axios because the two outcomes have different body
+// types: audio bytes on success, JSON on failure. A 503 is an expected
+// outcome (voice unavailable), so it is returned rather than thrown, and the
+// caller shows the script text instead.
+export async function fetchEmergencyAudio(id) {
+  const res = await fetch(`${API_BASE_WITH_PATH}/help-requests/${id}/audio`);
+
+  if (res.ok) {
+    const blob = await res.blob();
+    const header = res.headers.get("X-Neo-Script");
+    return {
+      ok: true,
+      url: URL.createObjectURL(blob),
+      script: header ? decodeURIComponent(header) : null,
+    };
+  }
+
+  const data = await res.json().catch(() => ({}));
+  return {
+    ok: false,
+    code: data.code || "synthesis_failed",
+    message: data.message || "Unable to generate audio.",
+    script: data.script || null,
+  };
+}
+
 // Structured emergency analysis (Gemini, with keyword fallback).
 export async function analyzeEmergency(message) {
   const res = await axios.post(`${API_BASE_WITH_PATH}/medai/analyze`, { message });
