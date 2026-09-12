@@ -1,0 +1,29 @@
+{
+  "name": "neo-mesh-ai",
+  "version": "1.0.0",
+  "description": "Neo Mesh AI - Offline mesh networking with AI-powered routing for emergency communications",
+  "type": "module",
+  "private": true,
+  "workspaces": [
+    "server",
+    "neo-dashboard",
+    "app"
+  ],
+  "scripts": {
+    "start": "cd server && npm start",
+    "start:server": "cd server && npm start",
+    "start:dashboard": "cd neo-dashboard && npm run dev",
+    "stop": "scripts\\stop.bat",
+    "start:app": "scripts\\start-app.bat"
+  },
+  "keywords": [
+    "mesh-network",
+    "offline",
+    "p2p",
+    "encryption",
+    "react-native",
+    "emergency-communications"
+  ],
+  "author": "Neo Team",
+  "license": "MIT"
+}
