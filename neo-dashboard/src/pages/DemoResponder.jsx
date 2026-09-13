@@ -11,6 +11,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { fetchResponderQueue, acceptRequest, resetDemo } from "../api/demoApi";
+import { formatLanguageName, isTranslated } from "../utils/formatters";
 import "./DemoResponder.css";
 
 const POLL_MS = 1500;
@@ -139,6 +140,13 @@ export default function DemoResponder() {
           const accepted = request.status === "accepted";
           const meta = describeMeta(request);
 
+          // When the victim wrote in another language, the responder reads the
+          // translated summary. Their original words stay visible below it,
+          // untranslated, so nothing is lost behind the AI.
+          const translated = isTranslated(ai);
+          const summary = translated ? ai.responderSummary : ai.summary;
+          const victimLanguage = translated ? formatLanguageName(ai.detectedLanguage) : null;
+
           return (
             <article
               key={request.id}
@@ -146,14 +154,23 @@ export default function DemoResponder() {
             >
               <div className="rCard__head">
                 <span className="rCard__category">{request.natureOfHelp || "Help Needed"}</span>
-                <span className={`rPriority ${PRIORITY_CLASS[request.priority] || ""}`}>
-                  {request.priority || "Normal"}
+                <span className="rCard__headRight">
+                  {victimLanguage && <span className="rLang">{victimLanguage}</span>}
+                  <span className={`rPriority ${PRIORITY_CLASS[request.priority] || ""}`}>
+                    {request.priority || "Normal"}
+                  </span>
                 </span>
               </div>
 
               {meta && <div className="rCard__meta">{meta}</div>}
 
-              {ai.summary && <p className="rCard__summary">{ai.summary}</p>}
+              {summary && <p className="rCard__summary">{summary}</p>}
+
+              {translated && (
+                <p className="rCard__translated">
+                  Translated from {victimLanguage} by Gemini
+                </p>
+              )}
 
               {ai.needs && ai.needs.length > 0 && (
                 <ul className="rCard__needs">
@@ -165,7 +182,9 @@ export default function DemoResponder() {
 
               {/* The AI summary never stands in for what the victim said. */}
               <div className="rCard__original">
-                <div className="rCard__originalLabel">Victim&rsquo;s own words</div>
+                <div className="rCard__originalLabel">
+                  Victim&rsquo;s own words{victimLanguage ? ` (${victimLanguage})` : ""}
+                </div>
                 <p className="rCard__originalText">&ldquo;{request.message}&rdquo;</p>
               </div>
 
