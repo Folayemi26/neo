@@ -16,6 +16,7 @@
 const { buildEmergencyScript } = require("./emergencyScript");
 
 const DEFAULT_API_BASE = "https://api.elevenlabs.io/v1/text-to-speech";
+const VOICES_URL = "https://api.elevenlabs.io/v1/voices";
 
 // Overridable so the voice path can be pointed at a stub in tests, or at a
 // proxy in a deployment that requires one.
@@ -33,6 +34,12 @@ const DEFAULT_TIMEOUT_MS = 15000;
 // Keyed by request id. Value holds the script it was generated from, so a
 // changed emergency regenerates instead of serving stale audio.
 const cache = new Map();
+
+// A voice id proven to work on this account, discovered after the configured
+// one was rejected. Voice ids are account-specific, so a default that is
+// merely plausible can fail at the worst moment; rather than hand-verify one,
+// the service looks up a real voice and remembers it.
+let discoveredVoiceId = null;
 
 function getApiKey() {
   return process.env.ELEVENLABS_API_KEY || null;
@@ -77,11 +84,61 @@ async function generateEmergencyAudio(request) {
     throw error;
   }
 
+  try {
+    let result;
+    try {
+      result = await synthesize(script, discoveredVoiceId || getVoiceId());
+    } catch (err) {
+      // A rejected voice id is recoverable: ask the account which voices it
+      // actually has, then retry once with a real one.
+      if (err.code === "bad_voice") {
+        const fallback = await lookupAnyVoiceId();
+        if (!fallback) throw err;
+        console.warn(`[Neo][VoiceService] ⚠️ Voice rejected; falling back to ${fallback}`);
+        result = await synthesize(script, fallback);
+        discoveredVoiceId = fallback;
+      } else {
+        throw err;
+      }
+    }
+
+    const entry = { audio: result.audio, contentType: "audio/mpeg", script };
+    cache.set(request.id, entry);
+
+    console.log(
+      `[Neo][VoiceService] 🔊 Generated ${result.audio.length} bytes for ${request.id}`
+    );
+    return { ...entry, cached: false };
+  } catch (err) {
+    if (err.code) throw err;
+    const error = new Error(`ElevenLabs request failed: ${err.message}`);
+    error.code = "synthesis_failed";
+    error.script = script;
+    throw error;
+  }
+}
+
+// Asks the account for a usable voice id. Returns null if the lookup itself
+// fails, in which case the original synthesis error stands.
+async function lookupAnyVoiceId() {
+  try {
+    const res = await fetch(VOICES_URL, { headers: { "xi-api-key": getApiKey() } });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const voice = (data.voices || [])[0];
+    return voice ? voice.voice_id : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+// One synthesis attempt against a specific voice.
+async function synthesize(script, voiceId) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), getTimeoutMs());
 
   try {
-    const response = await fetch(`${getApiBase()}/${getVoiceId()}`, {
+    const response = await fetch(`${getApiBase()}/${voiceId}`, {
       method: "POST",
       headers: {
         "xi-api-key": getApiKey(),
@@ -106,20 +163,14 @@ async function generateEmergencyAudio(request) {
       const error = new Error(
         `ElevenLabs returned ${response.status}: ${detail.slice(0, 200)}`
       );
-      error.code = "synthesis_failed";
+      // 404 and 422 are how a wrong or inaccessible voice id comes back.
+      error.code = response.status === 404 || response.status === 422 ? "bad_voice" : "synthesis_failed";
       error.status = response.status;
       error.script = script;
       throw error;
     }
 
-    const audio = Buffer.from(await response.arrayBuffer());
-    const entry = { audio, contentType: "audio/mpeg", script };
-    cache.set(request.id, entry);
-
-    console.log(
-      `[Neo][VoiceService] 🔊 Generated ${audio.length} bytes for ${request.id}`
-    );
-    return { ...entry, cached: false };
+    return { audio: Buffer.from(await response.arrayBuffer()), voiceId };
   } catch (err) {
     if (err.code) throw err;
     const error = new Error(
@@ -140,12 +191,19 @@ function clearCache() {
   return size;
 }
 
+// Exposed for tests, which need the discovered voice forgotten between cases.
+function _resetForTests() {
+  cache.clear();
+  discoveredVoiceId = null;
+}
+
 function cacheSize() {
   return cache.size;
 }
 
 module.exports = {
   isConfigured,
+  _resetForTests,
   getApiBase,
   generateEmergencyAudio,
   clearCache,

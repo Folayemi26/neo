@@ -5,7 +5,8 @@
   "type": "commonjs",
   "scripts": {
     "start": "node index.js",
-    "test": "node --test tests/*.test.js"
+    "test": "node --test tests/*.test.js",
+    "check:voice": "node scripts/check-voice.js"
   },
   "engines": {
     "node": ">=18.0.0",

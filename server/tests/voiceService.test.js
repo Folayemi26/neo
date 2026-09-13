@@ -44,14 +44,14 @@ function audioResponse(bytes = 32) {
 }
 
 test.beforeEach(() => {
-  VoiceService.clearCache();
+  VoiceService._resetForTests();
   process.env.ELEVENLABS_API_KEY = "test-key-not-a-real-secret";
 });
 
 test.afterEach(() => {
   global.fetch = realFetch;
   delete process.env.ELEVENLABS_API_KEY;
-  VoiceService.clearCache();
+  VoiceService._resetForTests();
 });
 
 test("without a key it reports not_configured and still returns the script", async () => {
@@ -187,4 +187,58 @@ test("the audio endpoint serves audio with the script in a header", async () => 
   assert.ok(decodeURIComponent(res.headers["X-Neo-Script"]).length > 0);
 
   await HelpRequestModel.clear();
+});
+
+
+// --- recovering from a voice id this account does not have ---
+
+test("a rejected voice id triggers a lookup and one retry", async () => {
+  const seen = [];
+  global.fetch = async (url, options) => {
+    seen.push(url);
+    if (url.includes("/voices") && !url.includes("text-to-speech")) {
+      return { ok: true, status: 200, json: async () => ({ voices: [{ voice_id: "real-voice-id", name: "Aria" }] }) };
+    }
+    if (url.endsWith("/real-voice-id")) return audioResponse(48);
+    return { ok: false, status: 404, text: async () => "voice_not_found" };
+  };
+
+  const result = await VoiceService.generateEmergencyAudio(REQUEST);
+
+  assert.strictEqual(result.audio.length, 48, "it recovered and produced audio");
+  assert.ok(seen.some((u) => u.includes("/v1/voices")), "it asked the account for a voice");
+  assert.ok(seen.some((u) => u.endsWith("/real-voice-id")), "it retried with a real voice");
+});
+
+test("the discovered voice is reused, not rediscovered every time", async () => {
+  let lookups = 0;
+  global.fetch = async (url) => {
+    if (url.includes("/v1/voices")) {
+      lookups += 1;
+      return { ok: true, status: 200, json: async () => ({ voices: [{ voice_id: "real-voice-id" }] }) };
+    }
+    if (url.endsWith("/real-voice-id")) return audioResponse();
+    return { ok: false, status: 404, text: async () => "voice_not_found" };
+  };
+
+  await VoiceService.generateEmergencyAudio(REQUEST);
+  await VoiceService.generateEmergencyAudio({ ...REQUEST, id: "another", priority: "High" });
+
+  assert.strictEqual(lookups, 1, "the working voice is remembered");
+});
+
+test("if the voice lookup also fails, the original error stands", async () => {
+  global.fetch = async (url) => {
+    if (url.includes("/v1/voices")) return { ok: false, status: 401, text: async () => "no access" };
+    return { ok: false, status: 404, text: async () => "voice_not_found" };
+  };
+
+  await assert.rejects(
+    () => VoiceService.generateEmergencyAudio(REQUEST),
+    (err) => {
+      assert.strictEqual(err.code, "bad_voice");
+      assert.ok(err.script, "the script is still available for the UI");
+      return true;
+    }
+  );
 });
