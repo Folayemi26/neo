@@ -10,7 +10,7 @@
 // gets a 409 and this view says so rather than pretending the claim worked.
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { fetchResponderQueue, acceptRequest, resetDemo, fetchEmergencyAudio } from "../api/demoApi";
+import { fetchResponderQueue, acceptRequest, resetDemo } from "../api/demoApi";
 import "./DemoResponder.css";
 
 const POLL_MS = 1500;
@@ -70,78 +70,6 @@ export default function DemoResponder() {
     };
   }, [load]);
 
-  // One <audio> element serves the page; `audio` tracks which request it is
-  // currently bound to and what state it is in. Generated clips are kept per
-  // request so replaying does not hit ElevenLabs again.
-  const [audio, setAudio] = useState({ id: null, status: "idle", script: null, message: null });
-  const audioRef = useRef(null);
-  const audioUrlsRef = useRef({});
-
-  useEffect(() => {
-    const el = new Audio();
-    el.onended = () => setAudio((a) => ({ ...a, status: "ended" }));
-    el.onpause = () => setAudio((a) => (a.status === "playing" ? { ...a, status: "paused" } : a));
-    el.onplay = () => setAudio((a) => ({ ...a, status: "playing" }));
-    audioRef.current = el;
-
-    const urls = audioUrlsRef.current;
-    return () => {
-      el.pause();
-      // Release the blobs this page created.
-      Object.values(urls).forEach((url) => URL.revokeObjectURL(url));
-    };
-  }, []);
-
-  const handlePlay = async (request) => {
-    const el = audioRef.current;
-    if (!el) return;
-
-    // Pause if this clip is already playing.
-    if (audio.id === request.id && audio.status === "playing") {
-      el.pause();
-      return;
-    }
-
-    const existing = audioUrlsRef.current[request.id];
-    if (existing) {
-      if (el.src !== existing) el.src = existing;
-      await el.play().catch(() => setAudio((a) => ({ ...a, status: "idle" })));
-      return;
-    }
-
-    setAudio({ id: request.id, status: "loading", script: null, message: null });
-    try {
-      const result = await fetchEmergencyAudio(request.id);
-
-      if (!result.ok) {
-        // Audio is never load-bearing: say so and leave the card usable.
-        setAudio({ id: request.id, status: "error", script: result.script, message: result.message });
-        return;
-      }
-
-      audioUrlsRef.current[request.id] = result.url;
-      el.src = result.url;
-      setAudio({ id: request.id, status: "playing", script: result.script, message: null });
-      await el.play().catch(() => setAudio((a) => ({ ...a, status: "idle" })));
-    } catch (err) {
-      setAudio({
-        id: request.id,
-        status: "error",
-        script: null,
-        message: "Unable to generate audio. Emergency details remain available below.",
-      });
-    }
-  };
-
-  const audioLabel = (request) => {
-    if (audio.id !== request.id) return "\ud83d\udd0a Play Emergency";
-    if (audio.status === "loading") return "Generating audio...";
-    if (audio.status === "playing") return "\u23f8 Pause";
-    if (audio.status === "paused") return "\u25b6 Resume";
-    if (audio.status === "ended") return "\u21bb Replay";
-    return "\ud83d\udd0a Play Emergency";
-  };
-
   const handleRespond = async (request) => {
     setBusyId(request.id);
     try {
@@ -168,10 +96,6 @@ export default function DemoResponder() {
     try {
       await resetDemo();
       setConflicts({});
-      Object.values(audioUrlsRef.current).forEach((url) => URL.revokeObjectURL(url));
-      audioUrlsRef.current = {};
-      if (audioRef.current) audioRef.current.pause();
-      setAudio({ id: null, status: "idle", script: null, message: null });
       await load();
     } catch (err) {
       setError("Reset failed. Is the Neo server running?");
@@ -259,13 +183,6 @@ export default function DemoResponder() {
               ) : (
                 <div className="rCard__actions">
                   <button
-                    className="rAudio"
-                    onClick={() => handlePlay(request)}
-                    disabled={audio.id === request.id && audio.status === "loading"}
-                  >
-                    {audioLabel(request)}
-                  </button>
-                  <button
                     className="rRespond"
                     onClick={() => handleRespond(request)}
                     disabled={busyId === request.id}
@@ -273,19 +190,6 @@ export default function DemoResponder() {
                     {busyId === request.id ? "Accepting..." : "Respond"}
                   </button>
                 </div>
-              )}
-
-              {audio.id === request.id && audio.status === "error" && (
-                <p className="rCard__audioError">
-                  {audio.message}
-                  {audio.script && (
-                    <span className="rCard__audioScript">Alert text: &ldquo;{audio.script}&rdquo;</span>
-                  )}
-                </p>
-              )}
-
-              {audio.id === request.id && audio.script && audio.status !== "error" && (
-                <p className="rCard__audioScript">Spoken alert: &ldquo;{audio.script}&rdquo;</p>
               )}
 
               {/* Shown even once the card reads as accepted: a responder whose

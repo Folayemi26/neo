@@ -25,8 +25,5 @@ router.patch("/:id/status", HelpRequestController.updateRequestStatus);
 // POST /api/help-requests/:id/accept - Claim a request as a responder
 router.post("/:id/accept", HelpRequestController.acceptHelpRequest);
 
-// GET /api/help-requests/:id/audio - Spoken emergency alert (ElevenLabs)
-router.get("/:id/audio", HelpRequestController.getHelpRequestAudio);
-
 module.exports = router;
 

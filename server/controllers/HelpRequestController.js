@@ -1,7 +1,6 @@
 // server/controllers/HelpRequestController.js
 const HelpRequestModel = require("../models/HelpRequestModel");
 const { buildDemoResponder } = require("../fixtures/demoFixtures");
-const VoiceService = require("../services/VoiceService");
 
 async function createHelpRequest(req, res) {
   try {
@@ -208,63 +207,8 @@ async function acceptHelpRequest(req, res) {
   }
 }
 
-// GET /api/help-requests/:id/audio
-//
-// Returns a spoken alert for this emergency as audio/mpeg. The script is
-// built server-side from the request's own structured fields; no
-// caller-supplied text is ever synthesized.
-//
-// On failure this returns 503 with the script text rather than an opaque
-// error, so the responder UI can say what would have been read aloud and
-// carry on. Audio never blocks reading or accepting an emergency.
-async function getHelpRequestAudio(req, res) {
-  try {
-    const { id } = req.params;
-    const request = await HelpRequestModel.getById(id);
-
-    if (!request) {
-      return res.status(404).json({
-        error: "Help request not found",
-        message: `No help request found with id: ${id}`,
-      });
-    }
-
-    // The stored request carries coordinates, not a distance: that is computed
-    // per responder. Annotate it here so the spoken alert can say how far away
-    // the emergency is, the same figure the responder card shows.
-    const preview = buildDemoResponder(request);
-    const result = await VoiceService.generateEmergencyAudio({
-      ...request,
-      distanceMiles: preview.distanceMiles,
-    });
-
-    res.set({
-      "Content-Type": result.contentType,
-      "Content-Length": result.audio.length,
-      // The spoken text, for the UI to display alongside the player.
-      "X-Neo-Script": encodeURIComponent(result.script),
-      "X-Neo-Audio-Cached": String(result.cached),
-      "Cache-Control": "no-store",
-    });
-    return res.send(result.audio);
-  } catch (err) {
-    const code = err.code === "not_configured" ? "not_configured" : "synthesis_failed";
-    console.warn(`[Neo][HelpRequestController] \u26a0\ufe0f Audio unavailable (${code}): ${err.message}`);
-    return res.status(503).json({
-      error: "Audio unavailable",
-      code,
-      message:
-        code === "not_configured"
-          ? "Voice synthesis is not configured on this server."
-          : "Unable to generate audio. Emergency details remain available.",
-      script: err.script || null,
-    });
-  }
-}
-
 module.exports = {
   createHelpRequest,
-  getHelpRequestAudio,
   acceptHelpRequest,
   getAllHelpRequests,
   getPendingRequests,

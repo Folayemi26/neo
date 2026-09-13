@@ -53,11 +53,7 @@ app.use(cors({
       callback(null, true); // Allow all for now, can restrict in production
     }
   },
-  credentials: true,
-  // The dashboard runs on a different origin in development, so custom
-  // response headers are invisible to it unless named here. The responder UI
-  // reads the spoken script off the audio response.
-  exposedHeaders: ["X-Neo-Script", "X-Neo-Audio-Cached"],
+  credentials: true
 }));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));

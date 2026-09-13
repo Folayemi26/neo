@@ -17,7 +17,6 @@
 
 const crypto = require("crypto");
 const HelpRequestModel = require("../models/HelpRequestModel");
-const VoiceService = require("./VoiceService");
 
 // Demo records are namespaced so a reset can find them without touching real
 // help requests.
@@ -295,13 +294,8 @@ async function reset() {
   transports.clear();
 
   const removed = await HelpRequestModel.removeByIdPrefix(DEMO_ID_PREFIX);
-  // Drop cached audio too, so a repeated demo regenerates rather than
-  // replaying the previous run's alert.
-  const clearedAudio = VoiceService.clearCache();
-  console.log(
-    `[Neo][DemoTransport] 🧹 Reset: removed ${removed} demo help request(s), cleared ${clearedAudio} cached clip(s)`
-  );
-  return { success: true, removedHelpRequests: removed, clearedAudioClips: clearedAudio };
+  console.log(`[Neo][DemoTransport] 🧹 Reset: removed ${removed} demo help request(s)`);
+  return { success: true, removedHelpRequests: removed };
 }
 
 module.exports = {
